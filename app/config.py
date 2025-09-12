@@ -9,7 +9,6 @@ class Settings:
     MONGODB_DB = os.getenv("MONGODB_DB", "atlas_documents")
     LINGUA_API_URL = os.getenv("LINGUA_API_URL", "http://localhost:8002")
     CENSUS_API_URL = os.getenv("CENSUS_API_URL", "http://localhost:8001")
-    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
     
     class Config:
         env_file = ".env"
