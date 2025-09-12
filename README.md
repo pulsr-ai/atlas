@@ -59,15 +59,14 @@ An open-source Python service for managing knowledge bases with intelligent docu
    cd atlas
    ```
 
-2. **Create virtual environment**
+2. **Install Poetry** (if not already installed)
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\\Scripts\\activate
+   curl -sSL https://install.python-poetry.org | python3 -
    ```
 
 3. **Install dependencies**
    ```bash
-   pip install -r requirements.txt
+   poetry install
    ```
 
 4. **Configure environment**
@@ -79,11 +78,11 @@ An open-source Python service for managing knowledge bases with intelligent docu
 5. **Set up databases**
    - Ensure PostgreSQL is running
    - Ensure MongoDB is running
-   - Run migrations: `alembic upgrade head`
+   - Run migrations: `poetry run alembic upgrade head`
 
 6. **Start the service**
    ```bash
-   python run.py
+   poetry run dev
    ```
 
 ## Configuration
@@ -96,7 +95,8 @@ Create a `.env` file with:
 DATABASE_URL=postgresql://user:password@localhost/atlas
 MONGODB_URL=mongodb://localhost:27017
 MONGODB_DB=atlas_documents
-LINGUA_API_URL=http://localhost:8080
+CENSUS_API_URL=http://localhost:8001
+LINGUA_API_URL=http://localhost:8002
 ```
 
 ### Lingua Integration
@@ -192,23 +192,23 @@ The service supports multiple sub-tenants through UUID-based isolation:
 
 ### Running Tests
 ```bash
-# Install test dependencies
-pip install pytest pytest-asyncio
-
 # Run tests
-pytest
+poetry run pytest
+
+# Run tests with coverage
+poetry run pytest --cov=app
 ```
 
 ### Database Migrations
 ```bash
 # Create new migration
-alembic revision --autogenerate -m "Description"
+poetry run alembic revision --autogenerate -m "Description"
 
 # Apply migrations
-alembic upgrade head
+poetry run alembic upgrade head
 
 # Rollback migration
-alembic downgrade -1
+poetry run alembic downgrade -1
 ```
 
 ### Adding New Features

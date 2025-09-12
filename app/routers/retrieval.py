@@ -1,16 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.database import get_db
+from app.models import Subtenant
+from app.auth import get_current_active_subtenant
 from app.services.agentic_retrieval_service import AgenticRetrievalService
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
 router = APIRouter()
 retrieval_service = AgenticRetrievalService()
+security = HTTPBearer()
 
 class RetrievalQuery(BaseModel):
     query: str
-    subtenant_id: Optional[str] = None
 
 class ChunkResult(BaseModel):
     chunk_id: str
@@ -37,12 +40,14 @@ class RetrievalResponse(BaseModel):
 @router.post("/retrieve", response_model=RetrievalResponse)
 async def agentic_retrieval(
     query: RetrievalQuery,
+    current_subtenant: Subtenant = Depends(get_current_active_subtenant),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ):
     
     try:
         result = await retrieval_service.retrieve(
-            db, query.query, query.subtenant_id
+            db, query.query, str(current_subtenant.id), credentials.credentials
         )
         
         return RetrievalResponse(
@@ -75,13 +80,13 @@ async def agentic_retrieval(
 @router.get("/retrieve/explain/{query}")
 async def explain_retrieval_reasoning(
     query: str,
-    subtenant_id: Optional[str] = None,
+    current_subtenant: Subtenant = Depends(get_current_active_subtenant),
     db: Session = Depends(get_db)
 ):
     
     try:
         result = await retrieval_service.retrieve(
-            db, query, subtenant_id
+            db, query, str(current_subtenant.id)
         )
         
         # Return just the reasoning path for explanation

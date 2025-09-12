@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from app.database import get_db
-from app.models import Directory, Document
+from app.models import Directory, Document, Subtenant, PermissionType, ResourceType
+from app.auth import get_current_active_subtenant, check_resource_access, can_access_resource
 from pydantic import BaseModel
 from typing import List, Optional
 import uuid
@@ -42,6 +43,7 @@ class DirectoryContents(BaseModel):
 async def list_directories(
     subtenant_id: Optional[str] = Query(None),
     include_private: bool = Query(False),
+    current_subtenant: Subtenant = Depends(get_current_active_subtenant),
     db: Session = Depends(get_db)
 ):
     
@@ -61,6 +63,13 @@ async def list_directories(
     
     directories = query.all()
     
+    # Filter directories based on ownership and permissions
+    accessible_directories = []
+    for dir in directories:
+        # Check if directory belongs to current subtenant or is shared with them
+        if dir.subtenant_id == current_subtenant.id or can_access_resource(db, current_subtenant, ResourceType.DIRECTORY, str(dir.id)):
+            accessible_directories.append(dir)
+    
     return [
         DirectoryItem(
             id=str(dir.id),
@@ -71,7 +80,7 @@ async def list_directories(
             is_private=dir.is_private,
             created_at=dir.created_at.isoformat() if dir.created_at else ""
         )
-        for dir in directories
+        for dir in accessible_directories
     ]
 
 @router.get("/directories/traverse", response_model=DirectoryContents)
@@ -79,6 +88,7 @@ async def traverse_directory(
     path: str = Query("/"),
     subtenant_id: Optional[str] = Query(None),
     include_private: bool = Query(False),
+    current_subtenant: Subtenant = Depends(get_current_active_subtenant),
     db: Session = Depends(get_db)
 ):
     
@@ -101,8 +111,8 @@ async def traverse_directory(
                 name="root",
                 path="/",
                 parent_id=None,
-                subtenant_id=uuid.UUID(subtenant_id) if subtenant_id else None,
-                is_private=bool(subtenant_id)
+                subtenant_id=current_subtenant.id,
+                is_private=True
             )
             db.add(directory)
             db.commit()
@@ -110,9 +120,9 @@ async def traverse_directory(
         else:
             raise HTTPException(status_code=404, detail="Directory not found")
     
-    # Check permissions
-    if directory.is_private and not include_private:
-        raise HTTPException(status_code=403, detail="Access denied to private directory")
+    # Check if directory belongs to current subtenant or is shared with them
+    if directory.subtenant_id != current_subtenant.id and not can_access_resource(db, current_subtenant, ResourceType.DIRECTORY, str(directory.id)):
+        raise HTTPException(status_code=403, detail="Access denied to directory")
     
     # Get subdirectories
     subdirs_query = db.query(Directory).filter(Directory.parent_id == directory.id)
@@ -168,6 +178,7 @@ async def traverse_directory(
 async def get_directory(
     directory_id: str,
     include_private: bool = Query(False),
+    current_subtenant: Subtenant = Depends(get_current_active_subtenant),
     db: Session = Depends(get_db)
 ):
     
@@ -181,9 +192,9 @@ async def get_directory(
     if not directory:
         raise HTTPException(status_code=404, detail="Directory not found")
     
-    # Check permissions
-    if directory.is_private and not include_private:
-        raise HTTPException(status_code=403, detail="Access denied to private directory")
+    # Check if directory belongs to current subtenant or is shared with them
+    if directory.subtenant_id != current_subtenant.id and not can_access_resource(db, current_subtenant, ResourceType.DIRECTORY, str(directory.id)):
+        raise HTTPException(status_code=403, detail="Access denied to directory")
     
     # Get subdirectories
     subdirs_query = db.query(Directory).filter(Directory.parent_id == directory.id)

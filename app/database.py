@@ -22,5 +22,5 @@ def get_mongodb():
     return mongodb
 
 async def init_db():
-    from app.models import Directory, Document, Chunk
+    from app.models import Directory, Document, Chunk, Subtenant, Permission
     Base.metadata.create_all(bind=engine)
