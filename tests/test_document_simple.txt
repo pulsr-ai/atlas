@@ -1,0 +1,34 @@
+# Machine Learning Model Deployment Strategies
+
+## Introduction
+Machine Learning model deployment is the process of making trained models available for inference in production environments. This critical phase transforms experimental models into business-value generating systems.
+
+## Deployment Patterns
+
+### Batch Inference
+Batch inference processes large volumes of data at scheduled intervals. Use cases include daily recommendation updates, fraud detection on transaction batches, and customer segmentation analysis.
+
+### Real-time Inference  
+Real-time inference serves individual predictions with low latency. Common applications include recommendation engines, fraud detection systems, and chatbot responses.
+
+### Streaming Inference
+Processes continuous data streams for near real-time insights. Used for IoT sensor data processing, financial market analysis, and network security monitoring.
+
+## Model Serving Architectures
+
+### Microservices Architecture
+Each model deployed as independent service, providing scalability and maintainability while allowing technology diversity.
+
+### Model-as-a-Service (MaaS)
+Centralized model serving platform with shared infrastructure, standardized APIs, and multi-tenancy support.
+
+### Edge Deployment
+Models deployed close to data sources, reducing latency and bandwidth while working with intermittent connectivity.
+
+## Best Practices
+
+1. Start with simple deployment patterns
+2. Implement comprehensive monitoring early  
+3. Design for scalability from the beginning
+4. Plan for model updates and rollbacks
+5. Document all deployment configurations

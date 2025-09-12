@@ -8,7 +8,7 @@ class SummaryService:
     def __init__(self):
         self.mongodb = get_mongodb()
     
-    async def generate_chunk_summary(self, content: str) -> str:
+    async def generate_chunk_summary(self, content: str, auth_token: str = None) -> str:
         
         prompt = f"""
         Please provide a concise summary (2-3 sentences) of the following text chunk:
@@ -17,19 +17,20 @@ class SummaryService:
         """
         
         try:
-            chat_id = "chunk_summary_session"
-            response = await lingua_client.send_message(chat_id, prompt)
+            if auth_token:
+                chat_id = await lingua_client.create_chat_for_user("Chunk Summary", auth_token)
+                response = await lingua_client.send_message(chat_id, prompt, auth_token)
+                
+                if "content" in response and response["content"]:
+                    return response["content"].strip()
             
-            if "content" in response and response["content"]:
-                return response["content"].strip()
-            else:
-                return self._generate_simple_summary(content)
+            return self._generate_simple_summary(content)
                 
         except Exception as e:
             print(f"LLM summary generation failed: {e}")
             return self._generate_simple_summary(content)
     
-    async def generate_document_summary(self, document: Document) -> str:
+    async def generate_document_summary(self, document: Document, auth_token: str = None) -> str:
         
         # Get document content from MongoDB
         doc_content = self.mongodb.documents.find_one({"_id": document.mongodb_id})
@@ -65,19 +66,24 @@ class SummaryService:
             """
         
         try:
-            chat_id = "document_summary_session"
-            response = await lingua_client.send_message(chat_id, prompt)
+            if auth_token:
+                # Create one chat session for this document
+                chat_id = await lingua_client.create_chat_for_user(
+                    f"Document Summary: {document.name}", 
+                    auth_token
+                )
+                response = await lingua_client.send_message(chat_id, prompt, auth_token)
+                
+                if "content" in response and response["content"]:
+                    return response["content"].strip()
             
-            if "content" in response and response["content"]:
-                return response["content"].strip()
-            else:
-                return self._generate_simple_summary(content)
+            return self._generate_simple_summary(content)
                 
         except Exception as e:
             print(f"LLM document summary generation failed: {e}")
             return self._generate_simple_summary(content)
     
-    async def generate_directory_summary(self, directory: Directory) -> str:
+    async def generate_directory_summary(self, directory: Directory, auth_token: str = None) -> str:
         
         # Get summaries of documents in this directory
         document_summaries = []
@@ -108,19 +114,23 @@ class SummaryService:
         """
         
         try:
-            chat_id = "directory_summary_session"
-            response = await lingua_client.send_message(chat_id, prompt)
+            if auth_token:
+                chat_id = await lingua_client.create_chat_for_user(
+                    f"Directory Summary: {directory.name}", 
+                    auth_token
+                )
+                response = await lingua_client.send_message(chat_id, prompt, auth_token)
+                
+                if "content" in response and response["content"]:
+                    return response["content"].strip()
             
-            if "content" in response and response["content"]:
-                return response["content"].strip()
-            else:
-                return f"Directory containing {len(document_summaries)} documents and {len(subdirectory_summaries)} subdirectories"
+            return f"Directory containing {len(document_summaries)} documents and {len(subdirectory_summaries)} subdirectories"
                 
         except Exception as e:
             print(f"LLM directory summary generation failed: {e}")
             return f"Directory containing {len(document_summaries)} documents and {len(subdirectory_summaries)} subdirectories"
     
-    async def should_update_directory_summary(self, directory: Directory) -> bool:
+    async def should_update_directory_summary(self, directory: Directory, auth_token: str = None) -> bool:
         
         if not directory.summary:
             return True
@@ -142,14 +152,18 @@ class SummaryService:
         """
         
         try:
-            chat_id = "directory_update_check_session"
-            response = await lingua_client.send_message(chat_id, prompt)
+            if auth_token:
+                chat_id = await lingua_client.create_chat_for_user(
+                    f"Directory Update Check: {directory.name}", 
+                    auth_token
+                )
+                response = await lingua_client.send_message(chat_id, prompt, auth_token)
+                
+                if "content" in response and response["content"]:
+                    answer = response["content"].strip().upper()
+                    return answer == "NO"
             
-            if "content" in response and response["content"]:
-                answer = response["content"].strip().upper()
-                return answer == "NO"
-            else:
-                return False  # Conservative: don't update if we can't determine
+            return False  # Conservative: don't update if we can't determine
                 
         except Exception as e:
             print(f"Directory update check failed: {e}")

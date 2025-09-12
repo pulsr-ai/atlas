@@ -21,7 +21,8 @@ class IngestionService:
         db: Session,
         file: UploadFile,
         directory_path: str = "/",
-        subtenant_id: Optional[str] = None
+        subtenant_id: Optional[str] = None,
+        auth_token: Optional[str] = None
     ) -> Document:
         
         # Ensure directory exists
@@ -30,8 +31,10 @@ class IngestionService:
         # Read file content
         content = await file.read()
         
-        # Convert to markdown using MarkItDown
-        markdown_content = self.md.convert_stream(content, file_extension=self._get_file_extension(file.filename))
+        # Convert to markdown using MarkItDown - create a BytesIO stream from content
+        import io
+        content_stream = io.BytesIO(content)
+        markdown_content = self.md.convert_stream(content_stream, file_extension=self._get_file_extension(file.filename))
         
         # Create document record
         document = Document(
@@ -67,10 +70,10 @@ class IngestionService:
         await self._chunk_document(db, document, markdown_content.text_content)
         
         # Generate summaries
-        await self._generate_summaries(db, document)
+        await self._generate_summaries(db, document, auth_token)
         
         # Update directory summary if needed
-        await self._update_directory_summary(db, directory)
+        await self._update_directory_summary(db, directory, auth_token)
         
         return document
     
@@ -78,7 +81,8 @@ class IngestionService:
         self,
         db: Session,
         document_id: str,
-        file: UploadFile
+        file: UploadFile,
+        auth_token: Optional[str] = None
     ) -> Document:
         
         # Get existing document
@@ -95,8 +99,10 @@ class IngestionService:
         # Read file content
         content = await file.read()
         
-        # Convert to markdown using MarkItDown
-        markdown_content = self.md.convert_stream(content, file_extension=self._get_file_extension(file.filename))
+        # Convert to markdown using MarkItDown - create a BytesIO stream from content
+        import io
+        content_stream = io.BytesIO(content)
+        markdown_content = self.md.convert_stream(content_stream, file_extension=self._get_file_extension(file.filename))
         
         # Create new document version
         new_version = Document(
@@ -133,7 +139,7 @@ class IngestionService:
         await self._chunk_document(db, new_version, markdown_content.text_content)
         
         # Generate summaries
-        await self._generate_summaries(db, new_version)
+        await self._generate_summaries(db, new_version, auth_token)
         
         return new_version
     
@@ -205,22 +211,22 @@ class IngestionService:
         
         db.commit()
     
-    async def _generate_summaries(self, db: Session, document: Document):
+    async def _generate_summaries(self, db: Session, document: Document, auth_token: Optional[str] = None):
         # Generate summaries for chunks and document
         for chunk in document.chunks:
             chunk_content = self.mongodb.chunks.find_one({"_id": chunk.mongodb_id})["content"]
-            chunk.summary = await self.summary_service.generate_chunk_summary(chunk_content)
+            chunk.summary = await self.summary_service.generate_chunk_summary(chunk_content, auth_token)
         
         # Generate document summary
-        document.summary = await self.summary_service.generate_document_summary(document)
+        document.summary = await self.summary_service.generate_document_summary(document, auth_token)
         
         db.commit()
     
-    async def _update_directory_summary(self, db: Session, directory: Directory):
+    async def _update_directory_summary(self, db: Session, directory: Directory, auth_token: Optional[str] = None):
         # Check if directory summary needs updating
-        should_update = await self.summary_service.should_update_directory_summary(directory)
+        should_update = await self.summary_service.should_update_directory_summary(directory, auth_token)
         if should_update:
-            directory.summary = await self.summary_service.generate_directory_summary(directory)
+            directory.summary = await self.summary_service.generate_directory_summary(directory, auth_token)
             db.commit()
     
     def _get_file_extension(self, filename: str) -> str:

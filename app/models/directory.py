@@ -13,7 +13,7 @@ class Directory(Base):
     path = Column(String(1000), nullable=False, unique=True)
     parent_id = Column(UUID(as_uuid=True), ForeignKey("directories.id"), nullable=True)
     summary = Column(Text, nullable=True)
-    subtenant_id = Column(UUID(as_uuid=True), nullable=True)
+    subtenant_id = Column(UUID(as_uuid=True), ForeignKey("subtenants.id"), nullable=True)
     is_private = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -21,3 +21,4 @@ class Directory(Base):
     parent = relationship("Directory", remote_side=[id], back_populates="children")
     children = relationship("Directory", back_populates="parent")
     documents = relationship("Document", back_populates="directory")
+    subtenant = relationship("Subtenant", back_populates="directories")

@@ -13,7 +13,7 @@ class Chunk(Base):
     chunk_index = Column(Integer, nullable=False)
     title = Column(String(500), nullable=True)
     summary = Column(Text, nullable=True)
-    mongodb_id = Column(String(24), nullable=False)
+    mongodb_id = Column(String(100), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     document = relationship("Document", back_populates="chunks")

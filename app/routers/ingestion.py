@@ -1,12 +1,16 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.database import get_db
+from app.models import Subtenant
+from app.auth import get_current_active_subtenant
 from app.services.ingestion_service import IngestionService
 from pydantic import BaseModel
 from typing import Optional
 
 router = APIRouter()
 ingestion_service = IngestionService()
+security = HTTPBearer()
 
 class DocumentResponse(BaseModel):
     id: str
@@ -24,13 +28,14 @@ class DocumentResponse(BaseModel):
 async def ingest_document(
     file: UploadFile = File(...),
     directory_path: str = "/",
-    subtenant_id: Optional[str] = None,
+    current_subtenant: Subtenant = Depends(get_current_active_subtenant),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ):
     
     try:
         document = await ingestion_service.ingest_document(
-            db, file, directory_path, subtenant_id
+            db, file, directory_path, str(current_subtenant.id), credentials.credentials
         )
         
         return DocumentResponse(
@@ -50,12 +55,14 @@ async def ingest_document(
 async def ingest_document_version(
     document_id: str,
     file: UploadFile = File(...),
+    current_subtenant: Subtenant = Depends(get_current_active_subtenant),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ):
     
     try:
         document = await ingestion_service.ingest_document_version(
-            db, document_id, file
+            db, document_id, file, credentials.credentials
         )
         
         return DocumentResponse(

@@ -13,7 +13,8 @@ class AgenticRetrievalService:
         self,
         db: Session,
         query: str,
-        subtenant_id: Optional[str] = None
+        subtenant_id: Optional[str] = None,
+        auth_token: Optional[str] = None
     ) -> Dict[str, Any]:
         
         # Step 1: Get directory structure and summaries
@@ -21,14 +22,14 @@ class AgenticRetrievalService:
         
         # Step 2: LLM reasoning to identify relevant directories
         relevant_directories = await self._identify_relevant_directories(
-            query, directory_structure
+            query, directory_structure, subtenant_id, auth_token
         )
         
         # Step 3: For each relevant directory, identify relevant documents
         relevant_documents = []
         for directory_info in relevant_directories:
             docs = await self._identify_relevant_documents(
-                db, query, directory_info
+                db, query, directory_info, auth_token
             )
             relevant_documents.extend(docs)
         
@@ -36,13 +37,13 @@ class AgenticRetrievalService:
         relevant_chunks = []
         for document_info in relevant_documents:
             chunks = await self._identify_relevant_chunks(
-                db, query, document_info
+                db, query, document_info, auth_token
             )
             relevant_chunks.extend(chunks)
         
         # Step 5: Compile and rank the final results
         final_results = await self._compile_and_rank_results(
-            query, relevant_chunks
+            query, relevant_chunks, auth_token
         )
         
         return {
@@ -87,7 +88,9 @@ class AgenticRetrievalService:
     async def _identify_relevant_directories(
         self,
         query: str,
-        directory_structure: List[Dict[str, Any]]
+        directory_structure: List[Dict[str, Any]],
+        subtenant_id: Optional[str] = None,
+        auth_token: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         
         directories_text = "\n".join([
@@ -111,11 +114,22 @@ class AgenticRetrievalService:
         """
         
         try:
-            chat_id = "directory_identification_session"
-            response = await lingua_client.send_message(chat_id, prompt)
+            if auth_token:
+                # Create a chat session using the user's Lingua subtenant
+                print("Creating chat for directory analysis...")
+                chat_id = await lingua_client.create_chat_for_user(
+                    "Directory Analysis", 
+                    auth_token
+                )
+                print(f"Chat created: {chat_id}")
+                response = await lingua_client.send_message(chat_id, prompt, auth_token)
+                print(f"Raw LLM response: {response}")
+            else:
+                raise Exception("Missing auth_token for LLM interaction")
             
             if "content" in response and response["content"]:
                 content = response["content"]
+                print(f"Directory LLM Response: {content}")  # Debug logging
                 
                 # Parse the response
                 reasoning = ""
@@ -128,6 +142,9 @@ class AgenticRetrievalService:
                     dirs_text = content.split("DIRECTORIES:")[1].strip()
                     directory_paths = [path.strip() for path in dirs_text.split(",")]
                 
+                print(f"Parsed reasoning: {reasoning}")  # Debug logging
+                print(f"Parsed directories: {directory_paths}")  # Debug logging
+                
                 # Filter and return relevant directories
                 relevant_dirs = []
                 for path in directory_paths:
@@ -137,7 +154,9 @@ class AgenticRetrievalService:
                             relevant_dirs.append(dir_info)
                             break
                 
-                return relevant_dirs[:5]  # Limit to top 5 directories
+                if relevant_dirs:
+                    print(f"Found {len(relevant_dirs)} relevant directories with LLM reasoning")
+                    return relevant_dirs[:5]  # Limit to top 5 directories
             
         except Exception as e:
             print(f"Directory identification failed: {e}")
@@ -149,7 +168,8 @@ class AgenticRetrievalService:
         self,
         db: Session,
         query: str,
-        directory_info: Dict[str, Any]
+        directory_info: Dict[str, Any],
+        auth_token: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         
         directory_id = uuid.UUID(directory_info["id"])
@@ -178,8 +198,14 @@ class AgenticRetrievalService:
         """
         
         try:
-            chat_id = "document_identification_session"
-            response = await lingua_client.send_message(chat_id, prompt)
+            if auth_token:
+                chat_id = await lingua_client.create_chat_for_user(
+                    "Document Analysis", 
+                    auth_token
+                )
+                response = await lingua_client.send_message(chat_id, prompt, auth_token)
+            else:
+                raise Exception("Missing auth_token for LLM interaction")
             
             if "content" in response and response["content"]:
                 content = response["content"]
@@ -226,7 +252,8 @@ class AgenticRetrievalService:
         self,
         db: Session,
         query: str,
-        document_info: Dict[str, Any]
+        document_info: Dict[str, Any],
+        auth_token: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         
         document_id = uuid.UUID(document_info["id"])
@@ -255,8 +282,14 @@ class AgenticRetrievalService:
         """
         
         try:
-            chat_id = "chunk_identification_session"
-            response = await lingua_client.send_message(chat_id, prompt)
+            if auth_token:
+                chat_id = await lingua_client.create_chat_for_user(
+                    "Chunk Analysis", 
+                    auth_token
+                )
+                response = await lingua_client.send_message(chat_id, prompt, auth_token)
+            else:
+                raise Exception("Missing auth_token for LLM interaction")
             
             if "content" in response and response["content"]:
                 content = response["content"]
@@ -322,7 +355,8 @@ class AgenticRetrievalService:
     async def _compile_and_rank_results(
         self,
         query: str,
-        chunks: List[Dict[str, Any]]
+        chunks: List[Dict[str, Any]],
+        auth_token: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         
         if not chunks:
@@ -352,8 +386,14 @@ class AgenticRetrievalService:
         """
         
         try:
-            chat_id = "result_ranking_session"
-            response = await lingua_client.send_message(chat_id, prompt)
+            if auth_token:
+                chat_id = await lingua_client.create_chat_for_user(
+                    "Result Ranking", 
+                    auth_token
+                )
+                response = await lingua_client.send_message(chat_id, prompt, auth_token)
+            else:
+                raise Exception("Missing auth_token for LLM interaction")
             
             if "content" in response and response["content"]:
                 content = response["content"]
