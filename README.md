@@ -211,14 +211,6 @@ poetry run alembic upgrade head
 poetry run alembic downgrade -1
 ```
 
-### Adding New Features
-
-1. Update models in `app/models/`
-2. Create/update services in `app/services/`
-3. Add API endpoints in `app/routers/`
-4. Create database migrations with Alembic
-5. Update tests and documentation
-
 ## License
 
 [License information here]
